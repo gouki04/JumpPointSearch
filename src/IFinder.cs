@@ -5,6 +5,6 @@ namespace jps
 {
     public interface IFinder
     {
-        List<Vector2> FindPath(Vector2 start, Vector2 end);
+        List<Vector2Int> FindPath(Vector2Int start, Vector2Int end);
     }
 }

@@ -38,10 +38,12 @@ namespace jps
         /// <summary>
         /// 寻路的结果，可以为null
         /// </summary>
-        protected List<Vector2> m_Path = null;
+        protected List<Vector2Int> m_Path = null;
 
-        protected Vector2 m_StartPos;
-        protected Vector2 m_GoalPos;
+        protected Vector2Int m_StartPos;
+        protected Vector2Int m_GoalPos;
+
+        protected EDiagonalMovement m_DiagonalMovement = EDiagonalMovement.IfAtMostOneObstacle;
 
         protected Dictionary<EGrid, uint> m_GridColor = new Dictionary<EGrid, uint>()
         {
@@ -69,13 +71,13 @@ namespace jps
             }
         }
 
-        protected EGrid this[Vector2 pos]
+        protected EGrid this[Vector2Int pos]
         {
             get {
-                return this[(int)pos.X, (int)pos.Y];
+                return this[pos.x, pos.y];
             }
             set {
-                this[(int)pos.X, (int)pos.Y] = value;
+                this[pos.x, pos.y] = value;
             }
         }
 
@@ -88,34 +90,31 @@ namespace jps
             return m_Board[x, y] != EGrid.Obstacle;
         }
 
+        protected Vector2Int RandomPos()
+        {
+            return new Vector2Int()
+            {
+                x = m_Rand.Next(0, m_BoardWidth),
+                y = m_Rand.Next(0, m_BoardHeight),
+            };
+        }
+
         public JPSEditor()
         {
             m_Rand = new Random(DateTime.Now.Millisecond);
             m_Board = new EGrid[m_BoardWidth, m_BoardHeight];
 
-            m_Alg = JumpPointSearch.CreateFinder(m_BoardWidth, m_BoardHeight, IsWalkableAt, EDiagonalMovement.Never);
+            m_Alg = JumpPointSearch.CreateFinder(m_BoardWidth, m_BoardHeight, IsWalkableAt, m_DiagonalMovement);
 
-            m_StartPos = new Vector2()
-            {
-                X = m_Rand.Next(0, m_BoardWidth),
-                Y = m_Rand.Next(0, m_BoardHeight),
-            };
-
+            m_StartPos = RandomPos();
             this[m_StartPos] = EGrid.Start;
 
-            m_GoalPos = new Vector2()
-            {
-                X = m_Rand.Next(0, m_BoardWidth),
-                Y = m_Rand.Next(0, m_BoardHeight),
-            };
+            m_GoalPos = RandomPos();
 
             while (m_GoalPos == m_StartPos) {
-                m_GoalPos = new Vector2()
-                {
-                    X = m_Rand.Next(0, m_BoardWidth),
-                    Y = m_Rand.Next(0, m_BoardHeight),
-                };
+                m_GoalPos = RandomPos();
             }
+
             this[m_GoalPos] = EGrid.Goal;
         }
 
@@ -129,12 +128,48 @@ namespace jps
                 return -1;
             }
 
-            return m_Path.IndexOf(new Vector2(x, y));
+            return m_Path.IndexOf(new Vector2Int(x, y));
+        }
+
+        public static bool EnumCombo<T>(string label, ref T cur_item) where T : struct, IConvertible
+        {
+            var cur_e = cur_item.ToString();
+
+            var ret = false;
+            if (ImGui.BeginCombo(label, cur_e)) {
+                foreach (var e in Enum.GetNames(typeof(T))) {
+                    var is_selected = e == cur_e;
+                    if (ImGui.Selectable(e, is_selected)) {
+                        cur_e = e;
+                        ret = true;
+                    }
+
+                    if (is_selected) {
+                        ImGui.SetItemDefaultFocus();
+                    }
+                }
+                ImGui.EndCombo();
+            }
+
+            if (ret) {
+                cur_item = (T)Enum.Parse(typeof(T), cur_e);
+            }
+
+            return ret;
         }
 
         public bool DrawGui()
         {
             ImGui.Begin("Board");
+
+            if (EnumCombo("", ref m_DiagonalMovement)) {
+                m_Alg = JumpPointSearch.CreateFinder(m_BoardWidth, m_BoardHeight, IsWalkableAt, m_DiagonalMovement);
+
+                if (m_Path != null) {
+                    m_Path = m_Alg.FindPath(m_StartPos, m_GoalPos);
+                }
+            }
+            ImGui.SameLine();
 
             if (ImGui.Button("Search Path")) {
                 m_Path = m_Alg.FindPath(m_StartPos, m_GoalPos);

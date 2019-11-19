@@ -46,11 +46,12 @@ namespace jps
             m_Nodes = new Node[width, height];
             m_IsWalkableAtFunc = func;
             m_Heuristic = Heuristic.Manhattan;
+            m_OpenList = new HeapPriorityQueue<Node>(16);
         }
 
-        protected Node GetNodeAt(Vector2 pos, bool create_when_not_exist = true)
+        protected Node GetNodeAt(Vector2Int pos, bool create_when_not_exist = true)
         {
-            return GetNodeAt((int)pos.X, (int)pos.Y, create_when_not_exist);
+            return GetNodeAt(pos.x, pos.y, create_when_not_exist);
         }
 
         protected Node GetNodeAt(int x, int y, bool create_when_not_exist = true)
@@ -79,89 +80,6 @@ namespace jps
             return m_IsWalkableAtFunc(x, y);
         }
 
-        /// <summary>
-        /// Get the neighbors of the given node.
-        ///     offsets      diagonalOffsets:
-        ///  +---+---+---+    +---+---+---+
-        ///  |   | 0 |   |    | 0 |   | 1 |
-        ///  +---+---+---+    +---+---+---+
-        ///  | 3 |   | 1 |    |   |   |   |
-        ///  +---+---+---+    +---+---+---+
-        ///  |   | 2 |   |    | 3 |   | 2 |
-        ///  +---+---+---+    +---+---+---+
-        /// </summary>
-        /// <param name="node"></param>
-        /// <param name="dia_movement"></param>
-        /// <returns></returns>
-        protected IEnumerable<Vector2> GetNeighbors(Node node, EDiagonalMovement dia_movement)
-        {
-            var x = node.x;
-            var y = node.y;
-
-            bool s0, s1, s2, s3;
-            s0 = s1 = s2 = s3 = false;
-
-            // ↑
-            if (IsWalkableAt(x, y - 1)) {
-                yield return new Vector2(x, y - 1);
-                s0 = true;
-            }
-            // →
-            if (IsWalkableAt(x + 1, y)) {
-                yield return new Vector2(x + 1, y);
-                s1 = true;
-            }
-            // ↓
-            if (IsWalkableAt(x, y + 1)) {
-                yield return new Vector2(x, y + 1);
-                s2 = true;
-            }
-            // ←
-            if (IsWalkableAt(x - 1, y)) {
-                yield return new Vector2(x - 1, y);
-                s3 = true;
-            }
-
-            bool d0, d1, d2, d3;
-            d0 = d1 = d2 = d3 = false;
-
-            if (dia_movement == EDiagonalMovement.Never) {
-                yield break;
-            }
-            else if (dia_movement == EDiagonalMovement.OnlyWhenNoObstacles) {
-                d0 = s3 && s0;
-                d1 = s0 && s1;
-                d2 = s1 && s2;
-                d3 = s2 && s3;
-            }
-            else if (dia_movement == EDiagonalMovement.IfAtMostOneObstacle) {
-                d0 = s3 || s0;
-                d1 = s0 || s1;
-                d2 = s1 || s2;
-                d3 = s2 || s3;
-            }
-            else if (dia_movement == EDiagonalMovement.Always) {
-                d0 = d1 = d2 = d3 = true;
-            }
-
-            // ↖
-            if (d0 && IsWalkableAt(x - 1, y - 1)) {
-                yield return new Vector2(x - 1, y - 1);
-            }
-            // ↗
-            if (d1 && IsWalkableAt(x + 1, y - 1)) {
-                yield return new Vector2(x + 1, y - 1);
-            }
-            // ↘
-            if (d2 && IsWalkableAt(x + 1, y + 1)) {
-                yield return new Vector2(x + 1, y + 1);
-            }
-            // ↙
-            if (d3 && IsWalkableAt(x - 1, y + 1)) {
-                yield return new Vector2(x - 1, y + 1);
-            }
-        }
-
         protected IEnumerable<Node> Backtrace(Node node)
         {
             do {
@@ -171,10 +89,11 @@ namespace jps
             } while (node != null);
         }
 
-        public List<Vector2> FindPath(Vector2 start, Vector2 end)
+        public List<Vector2Int> FindPath(Vector2Int start, Vector2Int end)
         {
             try {
-                m_OpenList = new HeapPriorityQueue<Node>(32);
+                m_OpenList.Clear();
+
                 m_StartNode = GetNodeAt(start);
                 m_EndNode = GetNodeAt(end);
 
@@ -189,7 +108,7 @@ namespace jps
                     node.is_closed = true;
 
                     if (node == m_EndNode) {
-                        return Backtrace(node).Reverse().Select(n => new Vector2(n.x, n.y)).ToList();
+                        return Backtrace(node).Reverse().Select(n => new Vector2Int(n.x, n.y)).ToList();
                     }
 
                     IdentifySuccessors(node);
@@ -218,10 +137,10 @@ namespace jps
             var y = node.y;
 
             foreach (var neighbor in FindNeighbors(node)) {
-                var jump_point = Jump((int)neighbor.X, (int)neighbor.Y, x, y);
+                var jump_point = Jump(neighbor.x, neighbor.y, x, y);
                 if (jump_point.HasValue) {
-                    var jx = (int)jump_point.Value.X;
-                    var jy = (int)jump_point.Value.Y;
+                    var jx = jump_point.Value.x;
+                    var jy = jump_point.Value.y;
                     var jump_node = GetNodeAt(jx, jy);
                     if (jump_node.is_closed) {
                         continue;
@@ -254,8 +173,8 @@ namespace jps
             }
         }
 
-        protected abstract Vector2? Jump(int x, int y, int px, int py);
+        protected abstract Vector2Int? Jump(int x, int y, int px, int py);
 
-        protected abstract IEnumerable<Vector2> FindNeighbors(Node node);
+        protected abstract IEnumerable<Vector2Int> FindNeighbors(Node node);
     }
 }

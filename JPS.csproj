@@ -203,6 +203,7 @@
     <Compile Include="src\JPS_MoveDiagonallyIfNoObstacle.cs" />
     <Compile Include="src\JPS_NeverMoveDiagonally.cs" />
     <Compile Include="src\JumpPointSearch.cs" />
+    <Compile Include="Vector2Int.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
